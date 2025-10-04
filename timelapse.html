@@ -7,6 +7,11 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 	<link rel="stylesheet" href="style.css">
 	<link rel="shortcut icon" href="favicon.png" type="image/png">
+
+	<link href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css" rel="stylesheet" />
+	<script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
+
+	<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
 </head>
 <body>
   <div id="map"></div>
@@ -81,15 +86,23 @@
 		}
 
     async function init() {
+			const center = [
+				(config.bounds[0][0] + config.bounds[1][0]) / 2,
+				(config.bounds[0][1] + config.bounds[1][1]) / 2
+			];
       const map = L.map("map", {
-        center: [54.508, 11.287],
-        zoom: 14.5,
+        center,
+        zoom: config.zoom,
 				zoomSnap: 0.25,
 				attributionControl: false,
       });
 
+			L.maplibreGL({
+				style: 'https://tiles.openfreemap.org/styles/liberty',
+			}).addTo(map);
+
 			const attribution = L.control.attribution({ position: "topright" });
-			attribution.addAttribution("Wplace Timelapse | " + (config.attribution || ""));
+			attribution.addAttribution("Wplace Timelapse");
 			attribution.addTo(map);
 
       const video = document.createElement("video");
@@ -157,14 +170,12 @@
 				}
 			});
 
-      const bounds = L.latLngBounds(
-        [54.468, 11.255],
-        [54.515, 11.319]
-      );
+      const bounds = L.latLngBounds(config.bounds);
 
       const overlay = L.videoOverlay(video, bounds, {
         autoplay: true,
-        muted: true
+        muted: true,
+				attribution: config.attribution
       }).addTo(map);
 
       let playing = true;

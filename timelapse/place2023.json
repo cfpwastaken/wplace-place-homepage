@@ -5,5 +5,10 @@
 	"logo": "favicon.png",
 	"timing": "timelapse/place2023.timing",
 	"progress": "timelapse/place2023.progress",
-	"link": "https://cfp.is-a.dev/place/"
+	"link": "https://cfp.is-a.dev/place/",
+	"bounds": [
+		[54.57201089935816, 11.250087559277336],
+		[54.36780992039874, 11.777255528027322]
+	],
+	"zoom": 11.5
 }
