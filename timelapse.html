@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Wplace Timelapse</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+	<link rel="stylesheet" href="style.css">
+	<link rel="shortcut icon" href="favicon.png" type="image/png">
+</head>
+<body>
+  <div id="map"></div>
+	<div id="controls">
+		<button id="play-pause">
+			<svg id="play-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play-icon lucide-play"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></svg>
+			<svg id="pause-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pause-icon lucide-pause"><rect x="14" y="3" width="5" height="18" rx="1"/><rect x="5" y="3" width="5" height="18" rx="1"/></svg>
+		</button>
+		<button id="fullscreen">
+			<svg id="fullscreen-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-maximize-icon lucide-maximize"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+			<svg id="shrink-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shrink-icon lucide-shrink"><path d="m15 15 6 6m-6-6v4.8m0-4.8h4.8"/><path d="M9 19.8V15m0 0H4.2M9 15l-6 6"/><path d="M15 4.2V9m0 0h4.8M15 9l6-6"/><path d="M9 4.2V9m0 0H4.2M9 9 3 3"/></svg>
+		</button>
+		<button id="slow">
+			<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-snail-icon lucide-snail"><path d="M2 13a6 6 0 1 0 12 0 4 4 0 1 0-8 0 2 2 0 0 0 4 0"/><circle cx="10" cy="13" r="8"/><path d="M2 21h12c4.4 0 8-3.6 8-8V7a2 2 0 1 0-4 0v6"/><path d="M18 3 19.1 5.2"/><path d="M22 3 20.9 5.2"/></svg>
+		</button>
+		<input type="range" id="video-progress">
+		<span id="date"></span>
+		<span id="progress"></span>
+		<a href="place2023.webm" download>
+			<button>
+				<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download-icon lucide-download"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>
+			</button>
+		</a>
+		<a href="#" id="link">
+			<img id="logo">
+		</a>
+	</div>
+  <script type="module">
+		const searchParams = new URLSearchParams(window.location.search);
+		const name = searchParams.get("name");
+		if(!name) {
+			alert("No timelapse specified");
+			throw new Error("No timelapse specified");
+		}
+		const configUrl = `timelapse/${name}.json`;
+
+		async function fetchConfig(url) {
+			const response = await fetch(url);
+			if (!response.ok) {
+				throw new Error(`HTTP error! status: ${response.status}`);
+			}
+			return await response.json();
+		}
+
+		const config = await fetchConfig(configUrl);
+		document.title = config.name + " - Wplace Timelapse";
+		document.getElementById("logo").src = config.logo || "favicon.png";
+		document.getElementById("logo").alt = config.name || "Logo";
+
+		const timing = config.timing ? (await fetch(config.timing).then(res => res.text())).match(/.{8}/g).map(n => {
+			const num = parseInt(n, 16)
+			const unixTimestamp = num * 1000;
+			return new Date(unixTimestamp);
+		}) : [];
+
+		const progress = config.progress ? (await fetch(config.progress).then(res => res.text())).match(/.{14}/g).map(n => {
+			// first 8 chars are unix timestamp in hex
+			const timestampHex = n.slice(0, 8);
+			const progressHex = n.slice(8);
+			const timestamp = parseInt(timestampHex, 16)
+			const unixTimestamp = timestamp * 1000;
+			const percentage = parseInt(progressHex, 16) / 10000;
+			return { timestamp: new Date(unixTimestamp), percentage };
+		}) : [];
+		console.log(progress)
+
+		if(config.link) {
+			const link = document.querySelector("#link");
+			link.href = config.link;
+			link.target = "_blank";
+			link.style.cursor = "pointer";
+		}
+
+    async function init() {
+      const map = L.map("map", {
+        center: [54.508, 11.287],
+        zoom: 14.5,
+				zoomSnap: 0.25,
+				attributionControl: false,
+      });
+
+			const attribution = L.control.attribution({ position: "topright" });
+			attribution.addAttribution("Wplace Timelapse | " + (config.attribution || ""));
+			attribution.addTo(map);
+
+      const video = document.createElement("video");
+      video.src = config.video;
+      video.crossOrigin = "anonymous";
+      video.muted = true;
+			video.style.imageRendering = "pixelated";
+			const progressbar = document.getElementById("video-progress");
+			video.addEventListener("loadedmetadata", () => {
+				progressbar.max = video.duration;
+				progressbar.value = 0;
+			});
+			video.addEventListener("timeupdate", () => {
+				if (!progressbar.getAttribute("max"))
+					progressbar.setAttribute("max", video.duration);
+				progressbar.value = video.currentTime;
+				
+				if(timing.length === 0) return;
+				const frame = Math.floor((video.currentTime / video.duration) * timing.length);
+				const date = timing[frame];
+				if(date) {
+					document.getElementById("date").textContent = date.toLocaleString("de-DE")
+				}
+
+				if(progress.length === 0) return;
+				const progressEntry = progress.slice().reverse().find(p => p.timestamp <= date);
+				if(progressEntry) {
+					document.getElementById("progress").textContent = `${(progressEntry.percentage).toFixed(2)}%`
+				}
+			});
+			progressbar.addEventListener("input", () => {
+				video.currentTime = progressbar.value;
+			});
+			const playIcon = document.getElementById("play-icon");
+			const pauseIcon = document.getElementById("pause-icon");
+			const playPauseButton = document.getElementById("play-pause");
+			document.getElementById("pause-icon").style.display = "none";
+			playPauseButton.addEventListener("click", () => {
+				if (video.paused) {
+					video.play();
+					playIcon.style.display = "none";
+					pauseIcon.style.display = "block";
+				} else {
+					video.pause();
+					playIcon.style.display = "block";
+					pauseIcon.style.display = "none";
+				}
+			});
+			document.addEventListener("keydown", (e) => {
+				if (e.code === "Space") {
+					e.preventDefault();
+					playPauseButton.click();
+				}
+			})
+			const slowButton = document.getElementById("slow");
+			let slow = false;
+			slowButton.addEventListener("click", () => {
+				slow = !slow;
+				if (slow) {
+					video.playbackRate = 0.1;
+					slowButton.style.backgroundColor = "#0e4886";
+				} else {
+					video.playbackRate = 1.0;
+					slowButton.style.backgroundColor = "";
+				}
+			});
+
+      const bounds = L.latLngBounds(
+        [54.468, 11.255],
+        [54.515, 11.319]
+      );
+
+      const overlay = L.videoOverlay(video, bounds, {
+        autoplay: true,
+        muted: true
+      }).addTo(map);
+
+      let playing = true;
+      map.on("click", () => {
+        playing = !playing;
+        playing ? video.play() : video.pause();
+      });
+    }
+
+		init();
+
+		// Fullscreen button
+		const fullscreenButton = document.getElementById("fullscreen");
+		const fullscreenIcon = document.getElementById("fullscreen-icon");
+		const shrinkIcon = document.getElementById("shrink-icon");
+		shrinkIcon.style.display = "none";
+		fullscreenButton.addEventListener("click", () => {
+			if (!document.fullscreenElement) {
+				document.documentElement.requestFullscreen();
+				fullscreenIcon.style.display = "none";
+				shrinkIcon.style.display = "block";
+			} else {
+				if (document.exitFullscreen) {
+					document.exitFullscreen();
+					fullscreenIcon.style.display = "block";
+					shrinkIcon.style.display = "none";
+				}
+			}
+		});
+  </script>
+
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+    #click { position: absolute; top: 10px; left: 10px; z-index: 1000; }
+		.leaflet-container { background: #acacac; }
+		#controls {
+			position: fixed;
+			bottom: 0px;
+			left: 0;
+			width: 100%;
+			height: 50px;
+			background: rgba(0, 0, 0, 0.8);
+			backdrop-filter: blur(10px);
+			z-index: 99999;
+			display: flex;
+			align-items: center;
+			gap: 10px;
+		}
+		#video-progress {
+			width: 100%;
+		}
+		#date,
+		#progress {
+			font-family: monospace;
+		}
+  </style>
+</body>
+</html>

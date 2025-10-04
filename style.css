@@ -54,6 +54,12 @@ button:hover {
 	background-color: #0e4886;
 }
 
+.btn-primary:disabled,
+button:disabled {
+	background-color: #555;
+	cursor: not-allowed;
+}
+
 .links {
 	display: flex;
 	gap: 10px;
