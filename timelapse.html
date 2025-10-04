@@ -174,8 +174,12 @@
 			document.getElementById("pause-icon").style.display = "none";
 			playPauseButton.addEventListener("click", () => {
 				if (video.paused) {
-					video.play();
-					setPlaybackState("pause");
+					const isPlaying = video.currentTime > 0 && !video.paused && !video.ended 
+    				&& video.readyState > video.HAVE_CURRENT_DATA;
+					if (!isPlaying) {
+						video.play();
+						setPlaybackState("pause");
+					}
 				} else {
 					video.pause();
 					setPlaybackState("play");
