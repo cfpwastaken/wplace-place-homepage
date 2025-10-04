@@ -21,6 +21,9 @@
 			<button id="play-pause">
 				<svg id="play-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play-icon lucide-play"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></svg>
 				<svg id="pause-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pause-icon lucide-pause"><rect x="14" y="3" width="5" height="18" rx="1"/><rect x="5" y="3" width="5" height="18" rx="1"/></svg>
+				<svg id="play-again-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-rotate-ccw-icon lucide-rotate-ccw"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+				<svg id="error-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-x-icon lucide-circle-x"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+				<svg id="seeking-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-loader-icon lucide-loader"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/></svg>
 			</button>
 			<button id="fullscreen">
 				<svg id="fullscreen-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-maximize-icon lucide-maximize"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
@@ -98,6 +101,22 @@
 			link.style.cursor = "pointer";
 		}
 
+		function setPlaybackState(state) {
+			const playIcon = document.getElementById("play-icon");
+			const pauseIcon = document.getElementById("pause-icon");
+			const playAgainIcon = document.getElementById("play-again-icon");
+			const errorIcon = document.getElementById("error-icon");
+			const seekingIcon = document.getElementById("seeking-icon");
+			playIcon.style.display = "none";
+			pauseIcon.style.display = "none";
+			playAgainIcon.style.display = "none";
+			errorIcon.style.display = "none";
+			seekingIcon.style.display = "none";
+			document.getElementById(state + "-icon").style.display = "block";
+		}
+
+		setPlaybackState("play");
+
     async function init() {
 			const center = [
 				(config.bounds[0][0] + config.bounds[1][0]) / 2,
@@ -156,14 +175,31 @@
 			playPauseButton.addEventListener("click", () => {
 				if (video.paused) {
 					video.play();
-					playIcon.style.display = "none";
-					pauseIcon.style.display = "block";
+					setPlaybackState("pause");
 				} else {
 					video.pause();
-					playIcon.style.display = "block";
-					pauseIcon.style.display = "none";
+					setPlaybackState("play");
 				}
 			});
+			video.addEventListener("ended", () => {
+				setPlaybackState("play-again");
+			})
+			video.addEventListener("error", () => {
+				setPlaybackState("error");
+			})
+			video.addEventListener("stalled", () => {
+				setPlaybackState("error");
+			})
+			video.addEventListener("seeking", () => {
+				setPlaybackState("seeking");
+			})
+			video.addEventListener("seeked", () => {
+				if (video.paused) {
+					setPlaybackState("play");
+				} else {
+					setPlaybackState("pause");
+				}
+			})
 			document.addEventListener("keydown", (e) => {
 				if (e.code === "Space") {
 					e.preventDefault();
@@ -243,6 +279,7 @@
 			display: flex;
 			align-items: center;
 			gap: 10px;
+			width: 100%;
 		}
 
 		#video-progress {
